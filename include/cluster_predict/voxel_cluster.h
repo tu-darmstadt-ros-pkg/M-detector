@@ -1,7 +1,7 @@
 #ifndef VOXEL_CLUSTER_H
 #define VOXEL_CLUSTER_H
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <Eigen/Core>
 #include <unordered_map>
 #include <unordered_set>
@@ -22,11 +22,11 @@ public:
 typedef pcl::PointXYZINormal PointType;
 
 struct Point_Cloud {
-    typedef boost::shared_ptr<Point_Cloud> Ptr;
+    using Ptr = std::shared_ptr<Point_Cloud>;
     int bbox_index{-1};
     int points_num{0};
     pcl::PointCloud<PointType>::Ptr cloud;
-    boost::shared_ptr<std::vector<int>> cloud_index;
+    std::shared_ptr<std::vector<int>> cloud_index;
     Point_Cloud(PointType point, int index)
     {
         this->cloud->points.push_back(point);
@@ -91,11 +91,11 @@ struct test_struct{
 // Hash value
 namespace std {
 template <> struct hash<VOXEL> {
-  int64_t operator()(const VOXEL &s) const {
+    int64_t operator()(const VOXEL &s) const {
     using std::hash;
     using std::size_t;
-    return (s.z * HASH_length * HASH_length + s.y * HASH_length + s.x);
-  }
+        return (s.z * HASH_length * HASH_length + s.y * HASH_length + s.x);
+    }
 };
 }
 
@@ -112,7 +112,7 @@ public:
     {
         points_ = points_in;
     }
-    
+
     void setVoxelResolution(float voxel_length, float edge_size_xy, float edge_size_z, const Eigen::Vector3f &xyz_origin_in)
     {
         Voxel_revolusion = voxel_length;
@@ -158,7 +158,7 @@ public:
                 umap_in[position].cloud.reset(new pcl::PointCloud<PointType>());
                 umap_in[position].cloud_index.reset(new std::vector<int>());
                 umap_in[position].points_num = 1;
-            }    
+            }
         }
     }
 
@@ -194,7 +194,7 @@ public:
                 umap_in[position].cloud_index.reset(new std::vector<int>());
                 umap_in[position].cloud_index->reserve(5);
                 umap_in[position].cloud_index->push_back(i);
-            }    
+            }
         }
     }
 
@@ -225,7 +225,7 @@ public:
                 umap[position]->cloud_index.reset(new std::vector<int>());
                 umap[position]->cloud_index->reserve(5);
                 umap[position]->cloud_index->push_back(i);
-            }    
+            }
         }
     }
 
@@ -278,11 +278,11 @@ public:
             int voxel_cur = voxel_list[voxel_ind];
             if (voxel_set.count(voxel_cur))
             {
-                std::unordered_set<int> voxel_added;
-                voxel_added.emplace(voxel_cur);
-                extendVoxelNeighbor(voxel_cur, voxel_added);
+            std::unordered_set<int> voxel_added;
+            voxel_added.emplace(voxel_cur);
+            extendVoxelNeighbor(voxel_cur, voxel_added);
                 int size = 0;
-                std::vector<int> voxel_candidate_vec;
+            std::vector<int> voxel_candidate_vec;
                 for(auto iter=voxel_added.begin(); iter!=voxel_added.end(); ++iter)
                 {
                     voxel_set.erase(*iter);

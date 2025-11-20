@@ -1,6 +1,6 @@
 #include <omp.h>
 #include <mutex>
-#include <math.h>
+#include <cmath>
 #include <thread>
 #include <fstream>
 #include <iostream>
@@ -8,16 +8,17 @@
 #include <unistd.h>
 
 #include <m-detector/DynObjFilter.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
+#include <visualization_msgs/msg/marker.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/io/pcd_io.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/Vector3.h>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/msg/vector3.hpp>
 #include <unistd.h> 
 #include <dirent.h> 
 #include <iomanip>
@@ -34,7 +35,9 @@ typedef pcl::PointCloud<PointType> PointCloudXYZI;
 
 pcl::PointCloud<pcl::PointXYZINormal> lastcloud;
 PointCloudXYZI::Ptr last_pc(new PointCloudXYZI());
-ros::Publisher pub_pointcloud, pub_marker, pub_iou_view;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pointcloud;
+rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_marker;
+rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_iou_view;
 
 
 string dataset_folder, pred_folder, pred_origin_folder, recall_folder, recall_origin_folder, label_folder, recall_file, recall_origin_file;
@@ -1041,19 +1044,29 @@ void SemanticCombine()
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "check_dynamic");
-    ros::NodeHandle nh;
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("check_dynamic");
     Init();
 
     int dataset = -1, start_param = 0, end_param = 0, start_se = 0, end_se = 0;
     bool is_origin = false;
-    nh.param<int>("dyn_obj/dataset", dataset, -1);
-    nh.param<bool>("dyn_obj/is_origin", is_origin, false);
-    nh.param<string>("dyn_obj/dataset_folder", dataset_folder,"/");
-    nh.param<int>("dyn_obj/start_param", start_param, -1);
-    nh.param<int>("dyn_obj/end_param", end_param, 0);
-    nh.param<int>("dyn_obj/start_se", start_se, -1);
-    nh.param<int>("dyn_obj/end_se", end_se, 0);
+    
+    // declare and read parameters (minimal replacement for nh.param)
+    node->declare_parameter<int>("dyn_obj.dataset", -1);
+    node->declare_parameter<bool>("dyn_obj.is_origin", false);
+    node->declare_parameter<std::string>("dyn_obj.dataset_folder", "/");
+    node->declare_parameter<int>("dyn_obj.start_param", -1);
+    node->declare_parameter<int>("dyn_obj.end_param", 0);
+    node->declare_parameter<int>("dyn_obj.start_se", -1);
+    node->declare_parameter<int>("dyn_obj.end_se", 0);
+
+    node->get_parameter("dyn_obj.dataset", dataset);
+    node->get_parameter("dyn_obj.is_origin", is_origin);
+    node->get_parameter("dyn_obj.dataset_folder", dataset_folder);
+    node->get_parameter("dyn_obj.start_param", start_param);
+    node->get_parameter("dyn_obj.end_param", end_param);
+    node->get_parameter("dyn_obj.start_se", start_se);
+    node->get_parameter("dyn_obj.end_se", end_se);
 
     if(dataset == 0)
     {
@@ -1402,6 +1415,6 @@ int main(int argc, char** argv)
         }
     }
 
-    ros::spin();
+    rclcpp::spin(node);
     return 0;
 }

@@ -1,47 +1,48 @@
 <?xml version="1.0"?>
-<package>
+<package format="3">
   <name>m_detector</name>
-  <version>0.0.0</version>
-
+  <version>0.0.1</version>
   <description>
-    This is a implemented version of M-detector which is original algorithm
-    is described in the following paper:
-        Moving Event Detection from LiDAR Point Streams.
+    ROS 2 (Jazzy) port of M-detector (Moving Event Detection from LiDAR Point Streams).
+    Original authors and license preserved.
   </description>
 
   <maintainer email="wu2020@connect.hku.hk">HuajieWu</maintainer>
-  
+  <!-- ROS2 Port Maintainer -->
+  <maintainer email="konstantin@stud.tu-darmstadt.de">Konstantin Michels</maintainer>
+
   <license>GNUv2</license>
 
   <author email="wu2020@connect.hku.hk">HuajieWu</author>
   <author email="yhangli@connect.hku.hk">YihangLi</author>
-  
-  <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>nav_msgs</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>tf</build_depend>
-  <build_depend>pcl_ros</build_depend>
-  <build_depend>livox_ros_driver</build_depend>
-  <build_depend>message_generation</build_depend>
 
-  <run_depend>geometry_msgs</run_depend>
-  <run_depend>nav_msgs</run_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>rospy</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>tf</run_depend>
-  <run_depend>pcl_ros</run_depend>
-  <run_depend>livox_ros_driver</run_depend>
-  <run_depend>message_runtime</run_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <test_depend>rostest</test_depend>
-  <test_depend>rosbag</test_depend>
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+
+  <build_depend>libpcl-dev</build_depend>
+  <exec_depend>libpcl-dev</exec_depend>
+  <depend>pcl_conversions</depend>
+  <depend>pcl_msgs</depend>
+
+  <build_depend>eigen3_cmake_module</build_depend>
+  <build_depend>libeigen3-dev</build_depend>
+  <exec_depend>libeigen3-dev</exec_depend>
+
+  <build_depend>libtbb-dev</build_depend>
+  <exec_depend>libtbb-dev</exec_depend>
+
+  <exec_depend>livox_ros_driver2</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <export>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

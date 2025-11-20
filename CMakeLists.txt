@@ -1,106 +1,136 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.16)
 project(m_detector)
 
-SET(CMAKE_BUILD_TYPE "Release")
-
-ADD_COMPILE_OPTIONS(-std=c++17 )
-set( CMAKE_CXX_FLAGS "-std=c++17 -O3 -ltbb" ) 
-
-add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
-
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fexceptions" )
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -ltbb -pthread -std=c++1z -std=c++17 -fexceptions")
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-message("Current CPU archtecture: ${CMAKE_SYSTEM_PROCESSOR}")
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)" )
-  include(ProcessorCount)
-  ProcessorCount(N)
-  message("Processer number:  ${N}")
-  # if(N GREATER 15)
-  #   add_definitions(-DMP_EN)
-  #   add_definitions(-DMP_PROC_NUM=14)
-  #   message("core for MP:  4")
-  # elseif(N GREATER 5)
-  if(N GREATER 5)
-    add_definitions(-DMP_EN)
-    add_definitions(-DMP_PROC_NUM=4)
-    message("core for MP:  3")
-  elseif(N GREATER 3)
-    math(EXPR PROC_NUM "${N} - 2")
-    add_definitions(-DMP_EN)
-    add_definitions(-DMP_PROC_NUM="${PROC_NUM}")
-    message("core for MP:  ${PROC_NUM}")
-  else()
-    add_definitions(-DMP_PROC_NUM=1)
-  endif()
-else()
-  add_definitions(-DMP_PROC_NUM=1)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(OpenMP QUIET)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}   ${OpenMP_C_FLAGS}")
+add_definitions(-DROOT_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/\")
+add_compile_options(-Wall -Wextra -Wpedantic)
 
-find_package(PythonLibs REQUIRED)
-# find_path(MATPLOTLIB_CPP_INCLUDE_DIRS "matplotlibcpp.h")
+find_package(ament_cmake REQUIRED)
 
-set(TBB_DIR "/usr/local/tbb-2019_U8")
-include("/home/huajie/package/oneTBB-2019_U8/cmake/TBBBuild.cmake")
-tbb_build(TBB_ROOT "/home/huajie/package/oneTBB-2019_U8" CONFIG_DIR TBB_DIR)
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  nav_msgs
-  sensor_msgs
-  roscpp
-  rospy
-  std_msgs
-  pcl_ros
-  tf
-  livox_ros_driver
-  message_generation
-  eigen_conversions
-)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_eigen REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(PCL REQUIRED COMPONENTS io filters)
+find_package(pcl_conversions REQUIRED)
+find_package(livox_ros_driver2 REQUIRED)
 
 find_package(Eigen3 REQUIRED)
-find_package(PCL 1.8 REQUIRED)
+
 find_package(TBB REQUIRED)
+find_package(OpenMP QUIET)
+
 find_package(OpenCV REQUIRED)
 
-message(Eigen: ${EIGEN3_INCLUDE_DIR})
+find_package(Python3 REQUIRED COMPONENTS Development)
 
-include_directories(
-	${catkin_INCLUDE_DIRS} 
-  ${EIGEN3_INCLUDE_DIR}
-  ${PCL_INCLUDE_DIRS}
-  ${PYTHON_INCLUDE_DIRS}
-  include)
+message(STATUS "Eigen include: ${EIGEN3_INCLUDE_DIRS}")
+message(STATUS "PCL include:   ${PCL_INCLUDE_DIRS}")
+message(STATUS "OpenCV ver:    ${OpenCV_VERSION}")
+message(STATUS "Python3 inc:   ${Python3_INCLUDE_DIRS}")
 
-generate_messages(
- DEPENDENCIES
- geometry_msgs
+include(ProcessorCount)
+ProcessorCount(N_CORES)
+if(NOT N_CORES)
+  set(N_CORES 1)
+endif()
+
+set(MP_PROC_NUM 1)
+if(N_CORES GREATER 5)
+  set(MP_PROC_NUM 4)
+elseif(N_CORES GREATER 3)
+  math(EXPR MP_PROC_NUM "${N_CORES} - 2")
+endif()
+
+set(MDETECTOR_COMMON_SRCS
+  src/DynObjFilter.cpp
+  src/DynObjCluster.cpp
 )
 
-catkin_package(
-  CATKIN_DEPENDS geometry_msgs nav_msgs roscpp rospy std_msgs message_runtime
-  DEPENDS EIGEN3 PCL
-  INCLUDE_DIRS
+add_executable(dynfilter
+  src/dynfilter_with_odom.cpp
+  ${MDETECTOR_COMMON_SRCS}
 )
 
+add_executable(display_prediction
+  src/display_prediction.cpp
+)
 
-add_executable(dynfilter src/dynfilter_with_odom.cpp src/DynObjFilter.cpp src/DynObjCluster.cpp)
-target_link_libraries(dynfilter ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} ${OpenCV_LIBS} TBB::tbb)
-target_include_directories(dynfilter PRIVATE ${PYTHON_INCLUDE_DIRS})
+add_executable(cal_recall
+  src/cal_recall_multi.cpp
+)
 
-add_executable(display_prediction src/display_prediction.cpp )
-target_link_libraries(display_prediction ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} ${OpenCV_LIBS} TBB::tbb)
-target_include_directories(display_prediction PRIVATE ${PYTHON_INCLUDE_DIRS})
+set(PROJ_PUBLIC_INCLUDE_DIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
+foreach(tgt dynfilter display_prediction cal_recall)
+  target_include_directories(${tgt}
+    PRIVATE
+      ${PROJ_PUBLIC_INCLUDE_DIRS}
+      ${EIGEN3_INCLUDE_DIRS}
+      ${PCL_INCLUDE_DIRS}
+      ${Python3_INCLUDE_DIRS}
+  )
 
-add_executable(cal_recall src/cal_recall_multi.cpp)
-target_link_libraries(cal_recall ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${PYTHON_LIBRARIES} ${OpenCV_LIBS} TBB::tbb)
-target_include_directories(cal_recall PRIVATE ${PYTHON_INCLUDE_DIRS})
+  if(MP_PROC_NUM GREATER 1)
+    target_compile_definitions(${tgt} PRIVATE MP_EN MP_PROC_NUM=${MP_PROC_NUM})
+  else()
+    target_compile_definitions(${tgt} PRIVATE MP_PROC_NUM=1)
+  endif()
 
+  ament_target_dependencies(${tgt}
+    rclcpp
+    std_msgs
+    sensor_msgs
+    nav_msgs
+    geometry_msgs
+    visualization_msgs
+    tf2
+    tf2_ros
+    tf2_eigen
+    tf2_geometry_msgs
+    pcl_conversions
+    livox_ros_driver2
+  )
 
+  target_link_libraries(${tgt}
+    TBB::tbb
+    ${PCL_LIBRARIES}
+    ${OpenCV_LIBS}
+    Python3::Python
+  )
+
+  if(OpenMP_CXX_FOUND)
+    target_link_libraries(${tgt} OpenMP::OpenMP_CXX)
+  endif()
+
+  target_compile_options(${tgt} PRIVATE -fexceptions)
+endforeach()
+
+install(TARGETS
+  dynfilter
+  display_prediction
+  cal_recall
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch config
+  DESTINATION share/${PROJECT_NAME}
+  OPTIONAL
+)
+
+ament_package()

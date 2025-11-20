@@ -1,32 +1,32 @@
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 #include <omp.h>
 #include <mutex>
-#include <math.h>
+#include <cmath>
 #include <thread>
 #include <fstream>
 #include <iostream>
 #include <csignal>
 #include <unistd.h>
 #include <Python.h>
-#include <ros/ros.h>
 #include <Eigen/Core>
 #include <types.h>
 #include <m-detector/DynObjFilter.h>
-#include <nav_msgs/Odometry.h>
-#include <nav_msgs/Path.h>
-#include <visualization_msgs/Marker.h>
+#include <nav_msgs/msg/odometry.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/io/pcd_io.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/Vector3.h>
+#include <sensor_msgs/msg/point_cloud2.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <geometry_msgs/msg/vector3.hpp>
 #include <pcl/filters/random_sample.h>
 #include <Eigen/Eigen>
-#include <eigen_conversions/eigen_msg.h>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 #include <deque>
 
@@ -56,38 +56,40 @@ int     cur_frame = 0;
 deque<M3D> buffer_rots;
 deque<V3D> buffer_poss;
 deque<double> buffer_times;
-deque<boost::shared_ptr<PointCloudXYZI>> buffer_pcs;
+deque<PointCloudXYZI::Ptr> buffer_pcs;
 
 
-ros::Publisher pub_pcl_dyn, pub_pcl_dyn_extend, pub_pcl_std; 
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pcl_dyn;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pcl_dyn_extend;
+rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_pcl_std;
 
-void OdomCallback(const nav_msgs::Odometry &cur_odom)
-{
+void OdomCallback(const nav_msgs::msg::Odometry::ConstSharedPtr cur_odom)
+  {
     Eigen::Quaterniond cur_q;
-    geometry_msgs::Quaternion tmp_q;
-    tmp_q = cur_odom.pose.pose.orientation;
-    tf::quaternionMsgToEigen(tmp_q, cur_q);
-    cur_rot = cur_q.matrix();
-    cur_pos << cur_odom.pose.pose.position.x, cur_odom.pose.pose.position.y, cur_odom.pose.pose.position.z;
+    //geometry_msgs::Quaternion tmp_q;
+    //tmp_q = cur_odom->pose.pose.orientation;
+    tf2::fromMsg(cur_odom->pose.pose.orientation, cur_q);
+    cur_rot = cur_q.toRotationMatrix();
+    cur_pos << cur_odom->pose.pose.position.x, cur_odom->pose.pose.position.y, cur_odom->pose.pose.position.z;
     buffer_rots.push_back(cur_rot);
     buffer_poss.push_back(cur_pos);
-    lidar_end_time = cur_odom.header.stamp.toSec();
+    lidar_end_time = rclcpp::Time(cur_odom->header.stamp).seconds();
     buffer_times.push_back(lidar_end_time);
-}
+  }
 
-void PointsCallback(const sensor_msgs::PointCloud2ConstPtr& msg_in)
-{
-    boost::shared_ptr<PointCloudXYZI> feats_undistort(new PointCloudXYZI());
+void PointsCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg_in)
+  {
+    PointCloudXYZI::Ptr feats_undistort(new PointCloudXYZI());
     pcl::fromROSMsg(*msg_in, *feats_undistort);
     buffer_pcs.push_back(feats_undistort); 
-}
+  }
 
 
-void TimerCallback(const ros::TimerEvent& e)
-{
+void TimerCallback()
+  {
     if(buffer_pcs.size() > 0 && buffer_poss.size() > 0 && buffer_rots.size() > 0 && buffer_times.size() > 0)
     {
-        boost::shared_ptr<PointCloudXYZI> cur_pc = buffer_pcs.at(0);
+        PointCloudXYZI::Ptr cur_pc = buffer_pcs.at(0);
         buffer_pcs.pop_front();
         auto cur_rot = buffer_rots.at(0);
         buffer_rots.pop_front();
@@ -98,7 +100,7 @@ void TimerCallback(const ros::TimerEvent& e)
         string file_name = out_folder;
         stringstream ss;
         ss << setw(6) << setfill('0') << cur_frame ;
-        file_name += ss.str(); 
+        file_name += ss.str();
         file_name.append(".label");
         string file_name_origin = out_folder_origin;
         stringstream sss;
@@ -112,27 +114,37 @@ void TimerCallback(const ros::TimerEvent& e)
         DynObjFilt->filter(cur_pc, cur_rot, cur_pos, cur_time);
         DynObjFilt->publish_dyn(pub_pcl_dyn, pub_pcl_dyn_extend, pub_pcl_std, cur_time);
         cur_frame ++;
-    }
+  }
 }
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "dynfilter_odom");
-    ros::NodeHandle nh;
-    nh.param<string>("dyn_obj/points_topic", points_topic, "");
-    nh.param<string>("dyn_obj/odom_topic", odom_topic, "");
-    nh.param<string>("dyn_obj/out_file", out_folder,"");
-    nh.param<string>("dyn_obj/out_file_origin", out_folder_origin, "");
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<rclcpp::Node>("dynfilter_odom");
+    points_topic = node->declare_parameter<std::string>("dyn_obj.points_topic", "");
+    odom_topic = node->declare_parameter<std::string>("dyn_obj.odom_topic", "");
+    out_folder = node->declare_parameter<std::string>("dyn_obj.out_file", "");
+    out_folder_origin  = node->declare_parameter<std::string>("dyn_obj.out_file_origin", "");
 
-    DynObjFilt->init(nh);    
-    /*** ROS subscribe and publisher initialization ***/
-    pub_pcl_dyn_extend = nh.advertise<sensor_msgs::PointCloud2>("/m_detector/frame_out", 10000);  
-    pub_pcl_dyn = nh.advertise<sensor_msgs::PointCloud2> ("/m_detector/point_out", 100000);
-    pub_pcl_std  = nh.advertise<sensor_msgs::PointCloud2> ("/m_detector/std_points", 100000);   
-    ros::Subscriber sub_pcl = nh.subscribe(points_topic, 200000, PointsCallback);
-    ros::Subscriber sub_odom = nh.subscribe(odom_topic, 200000, OdomCallback);
-    ros::Timer timer = nh.createTimer(ros::Duration(0.01), TimerCallback);
+    DynObjFilt = std::make_shared<DynObjFilter>();
+    DynObjFilt->init(node);
 
-    ros::spin();
+    pub_pcl_dyn_extend = node->create_publisher<sensor_msgs::msg::PointCloud2>("/m_detector/frame_out", rclcpp::QoS(10));     // queue depth ~10 (statt 10000)
+    pub_pcl_dyn = node->create_publisher<sensor_msgs::msg::PointCloud2>("/m_detector/point_out", rclcpp::QoS(10));
+    pub_pcl_std = node->create_publisher<sensor_msgs::msg::PointCloud2>("/m_detector/std_points", rclcpp::QoS(10));
+
+    using std::placeholders::_1;
+
+    auto sub_pcl = node->create_subscription<sensor_msgs::msg::PointCloud2>(points_topic, rclcpp::SensorDataQoS(), &PointsCallback);
+
+    auto sub_odom = node->create_subscription<nav_msgs::msg::Odometry>(odom_topic, rclcpp::QoS(50), &OdomCallback);
+
+    auto timer = node->create_wall_timer(
+      std::chrono::milliseconds(10),
+      TimerCallback 
+    );
+
+    rclcpp::spin(node);
+    rclcpp::shutdown();
     return 0;
 }

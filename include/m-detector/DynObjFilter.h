@@ -3,20 +3,20 @@
 
 #include <omp.h>
 #include <mutex>
-#include <math.h>
-#include <ros/ros.h>
+#include <cmath>
+#include <rclcpp/rclcpp.hpp>
 // #include <so3_math.h>
 #include <Eigen/Core>
 #include <types.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/ply_io.h>
-#include <nav_msgs/Path.h>
+#include <nav_msgs/msg/path.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <nav_msgs/Odometry.h>
-#include <sensor_msgs/CompressedImage.h>
+#include <nav_msgs/msg/odometry.h>
+#include <sensor_msgs/msg/compressed_image.h>
 #include <pcl/filters/voxel_grid.h>
-#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/msg/point_cloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <Eigen/LU>
 #include <m-detector/DynObjCluster.h>
@@ -74,8 +74,8 @@ struct point_soph
     V3D          last_closest;
     array<float, MAP_NUM> last_depth_interps = {};
     array<V3F, HASH_PRIM> last_vecs = {};
-    array<Vector3i, HASH_PRIM> last_positions = {};   
-    typedef boost::shared_ptr<point_soph> Ptr;
+    array<Vector3i, HASH_PRIM> last_positions = {};
+    using Ptr = std::shared_ptr<point_soph>;
     point_soph(V3D & point, float & hor_resolution_max, float & ver_resolution_max)
     {
         vec(2)     = float(point.norm());
@@ -145,7 +145,7 @@ struct point_soph
         last_closest.setZero();
     };
     point_soph(const point_soph & cur)
-    {   
+    {
         vec = cur.vec;
         hor_ind  = cur.hor_ind;
         ver_ind  = cur.ver_ind;
@@ -217,7 +217,7 @@ public:
     int*             max_depth_index_all = nullptr;
     int*             min_depth_index_all = nullptr;
     std::vector<int> index_vector;
-    typedef boost::shared_ptr<DepthMap> Ptr;
+    using Ptr = std::shared_ptr<DepthMap>;
 
     DepthMap()
     {   
@@ -336,7 +336,7 @@ public:
 };
 
 
-class DynObjFilter 
+class DynObjFilter
 {
 public:
     std::deque<DepthMap::Ptr> depth_map_list;
@@ -346,7 +346,7 @@ public:
     int cur_point_soph_pointers = 0;
     int max_pointers_num = 0;
     int frame_num_for_rec = 0;
-    std::deque<PointCloudXYZI::Ptr> pcl_his_list;;
+    std::deque<PointCloudXYZI::Ptr> pcl_his_list;
     PointCloudXYZI::Ptr laserCloudSteadObj;
     PointCloudXYZI::Ptr laserCloudSteadObj_hist;
     PointCloudXYZI::Ptr laserCloudDynObj;
@@ -400,7 +400,7 @@ public:
 
     int    occu_time_th = 3, is_occu_time_th = 3, map_index = 0;
     int    case1_num = 0, case2_num = 0, case3_num = 0;
-    
+
     double time_interp1 = 0.0, time_interp2 = 0.0;
     double time_search = 0.0, time_search_0 = 0.0, time_research = 0.0, time_build = 0.0, time_other0 = 0.0, time_total = 0.0, time_total_avr = 0.0;
     float  buffer_time = 0.0f, buffer_dur = 0.1f;
@@ -423,7 +423,7 @@ public:
     bool dyn_filter_en = true;
     mutex mtx_case2, mtx_case3; 
     std::vector<int> pos_offset;
-    ros::Publisher demo_pcl_display;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr demo_pcl_display;
     string time_file;
     ofstream time_out;
 
@@ -437,9 +437,9 @@ public:
     {};
     ~DynObjFilter(){};
 
-    void init(ros::NodeHandle& nh);
+    void init(const rclcpp::Node::SharedPtr &node);
     void filter(PointCloudXYZI::Ptr feats_undistort, const M3D & rot_end, const V3D & pos_end, const double & scan_end_time);
-    void publish_dyn(const ros::Publisher & pub_point_out, const ros::Publisher & pub_frame_out, const ros::Publisher & pub_steady_points, const double & scan_end_time);
+    void publish_dyn(const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr & pub_point_out, const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr & pub_frame_out, const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr & pub_steady_points, const double & scan_end_time);
     void set_path(string file_path, string file_path_origin);
 
     void  Points2Buffer(vector<point_soph*> &points, std::vector<int> &index_vector);
