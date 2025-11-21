@@ -118,8 +118,8 @@ void DynObjFilter::init(const rclcpp::Node::SharedPtr &node)
     getParam("dyn_obj/cluster_Voxel_revolusion", Cluster.Voxel_revolusion, 0.3f);
     getParam("dyn_obj/cluster_debug_en", Cluster.debug_en, false);
     getParam("dyn_obj/cluster_out_file", Cluster.out_file, std::string(""));
-    getParam("dyn_obj/ver_resolution_max", hor_resolution_max, 0.0025f);
-    getParam("dyn_obj/hor_resolution_max", ver_resolution_max, 0.0025f);
+    getParam("dyn_obj/ver_resolution_max", ver_resolution_max, 0.0025f);
+    getParam("dyn_obj/hor_resolution_max", hor_resolution_max, 0.0025f);
     getParam("dyn_obj/buffer_dur", buffer_dur, 0.1f);
     getParam("dyn_obj/point_index", point_index, 0);
     getParam("dyn_obj/frame_id", frame_id, std::string("camera_init"));
