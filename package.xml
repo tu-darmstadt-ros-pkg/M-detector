@@ -24,6 +24,9 @@
   <depend>nav_msgs</depend>
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
+  <depend>livox_ros_driver2</depend>
+
+  <exec_depend>rviz2</exec_depend>
 
   <build_depend>libpcl-dev</build_depend>
   <exec_depend>libpcl-dev</exec_depend>
@@ -36,8 +39,6 @@
 
   <build_depend>libtbb-dev</build_depend>
   <exec_depend>libtbb-dev</exec_depend>
-
-  <exec_depend>livox_ros_driver2</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
